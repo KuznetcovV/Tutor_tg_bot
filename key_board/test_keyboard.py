@@ -13,7 +13,7 @@ inlineKb = InlineKeyboardMarkup(inline_keyboard=[[
 reply_kb = ReplyKeyboardMarkup(keyboard=[[
     KeyboardButton(text='Кнопка 3'),
     KeyboardButton(text='Кнопка 4')
-]])
+]], resize_keyboard=True)
 
 reply_kb2 = ReplyKeyboardBuilder()
 reply_kb2.button(text='Кнопка 5')
