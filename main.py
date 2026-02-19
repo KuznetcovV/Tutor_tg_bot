@@ -4,7 +4,9 @@ from aiogram import Bot, Dispatcher, Router
 from aiogram.filters import CommandStart, Command
 from aiogram.types import Message, BotCommand, BotCommandScopeDefault
 from dotenv import load_dotenv
+from database import init_db, get_all_students
 
+init_db()
 load_dotenv()
 TOKEN = os.getenv('BOT_TOKEN')
 dp = Dispatcher()
@@ -24,7 +26,18 @@ async def cmd_today(message: Message):
 
 @dp.message(Command('students'))
 async def cmd_students(message: Message):
-    await message.answer('Список всех учеников, которые есть')
+    students = get_all_students()
+    if not students:
+        await message.answer('Список пуст!!!')
+        return
+
+    text = 'Список учеников:\n\n'
+
+    for student in students:
+        student_id, name, student_class = student
+        text += f'{student_id}. {name} - {student_class} класс.\n'
+
+    await message.answer(text)
 
 
 @dp.message(Command('students_today'))

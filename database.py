@@ -1,0 +1,23 @@
+import sqlite3
+
+DB_NAME = 'ALL_STUDENTS'
+
+
+def init_db():
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS students (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            class INTEGER DEFAULT 0
+            )
+        """)
+
+
+def get_all_students():
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM students")
+        students = cursor.fetchall()
+        return students
