@@ -1,58 +1,65 @@
 import asyncio
 import os
-from aiogram import Bot, Dispatcher, Router
+from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.fsm.context import FSMContext
+from aiogram import Bot, Dispatcher, Router, F
 from aiogram.filters import CommandStart, Command
-from aiogram.types import Message, BotCommand, BotCommandScopeDefault
+from aiogram.fsm.state import State, StatesGroup
+from aiogram.types import Message, BotCommand, BotCommandScopeDefault, CallbackQuery
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 from dotenv import load_dotenv
-from database import init_db, get_all_students
+from database import init_db, get_all_students, add_new_student
 
 init_db()
 load_dotenv()
 TOKEN = os.getenv('BOT_TOKEN')
-dp = Dispatcher()
+dp = Dispatcher(storage=MemoryStorage())
 bot = Bot(token=TOKEN)
 router = Router()
 
 
-@dp.message(CommandStart())
-async def start(message: Message):
-    await message.answer(f'Привет, {message.from_user.full_name}')
+class AddStudent(StatesGroup):
+    name = State()
+    student_class = State()
 
 
-@dp.message(Command('today'))
-async def cmd_today(message: Message):
-    await message.answer('Вот твои дела на сегодня')
+@router.callback_query(F.data == 'add_student')
+async def start_add(callback: CallbackQuery, state: FSMContext):
+    await callback.message.answer('Введите имя ученика:')
+    await state.set_state(AddStudent.name)
 
 
-@dp.message(Command('students'))
-async def cmd_students(message: Message):
+@router.message(F.text, AddStudent.name)
+async def capture_name(message: Message, state: FSMContext):
+    await state.update_data(name=message.text)
+    await message.answer('Отлично! Теперь напишите класс ученика: ')
+    await state.set_state(AddStudent.student_class)
+
+
+@router.message(F.text, AddStudent.student_class)
+async def capture_student_class(message: Message, state: FSMContext):
+    keyboard = InlineKeyboardBuilder()
+    await state.update_data(student_class=message.text)
+    student = await state.get_data()
+    add_new_student(student.get('name'), student.get('student_class'))
     students = get_all_students()
-    if not students:
-        await message.answer('Список пуст!!!')
-        return
-
+    msg_text = (f'Ученик {student.get('name')}, который учится в {student.get('student_class')} классе добавлен')
     text = 'Список учеников:\n\n'
-
     for student in students:
         student_id, name, student_class = student
         text += f'{student_id}. {name} - {student_class} класс.\n'
-
-    await message.answer(text)
-
-
-@dp.message(Command('students_today'))
-async def cmd_students_today(message: Message):
-    await message.answer('Вот ученики, которые сегодня будут')
-
-
-@dp.message(Command('payments'))
-async def cmd_payments(message: Message):
-    await message.answer('Список оплат за этот месяц')
+    keyboard.button(text='Добавить ученика', callback_data='add_student')
+    keyboard.button(text='Изменить запись об ученике', callback_data='change_student')
+    keyboard.button(text='Удалить ученика', callback_data='delete_student')
+    keyboard.adjust(2)
+    await message.answer(text, reply_markup=keyboard.as_markup())
+    await message.answer(msg_text)
+    await state.clear()
 
 
-@dp.message(Command('transfers'))
-async def cmd_transfers(message: Message):
-    await message.answer('Все переносы')
+@router.message(CommandStart())
+async def start(message: Message):
+    await message.answer(f'Привет, {message.from_user.full_name}')
 
 
 async def set_commands():
@@ -64,7 +71,48 @@ async def set_commands():
     await bot.set_my_commands(commands, BotCommandScopeDefault())
 
 
+@router.message(Command('today'))
+async def cmd_today(message: Message):
+    await message.answer('Вот твои дела на сегодня')
+
+
+@router.message(Command('students'))
+async def cmd_students(message: Message):
+    students = get_all_students()
+    keyboard = InlineKeyboardBuilder()
+    if not students:
+        text = 'Список пуст!!!'
+        keyboard.button(text='Добавить ученика', callback_data='add_student')
+    else:
+        text = 'Список учеников:\n\n'
+        for student in students:
+            student_id, name, student_class = student
+            text += f'{student_id}. {name} - {student_class} класс.\n'
+        keyboard.button(text='Добавить ученика', callback_data='add_student')
+        keyboard.button(text='Изменить запись об ученике', callback_data='change_student')
+        keyboard.button(text='Удалить ученика', callback_data='delete_student')
+        keyboard.adjust(2)
+    await message.answer(text, reply_markup=keyboard.as_markup())
+
+
+@router.message(Command('students_today'))
+async def cmd_students_today(message: Message):
+    await message.answer('Вот ученики, которые сегодня будут')
+
+
+@router.message(Command('payments'))
+async def cmd_payments(message: Message):
+    await message.answer('Список оплат за этот месяц')
+
+
+@router.message(Command('transfers'))
+async def cmd_transfers(message: Message):
+    await message.answer('Все переносы')
+
+
 async def main():
+    dp.include_router(router)
+
     await bot.delete_webhook(drop_pending_updates=True)
     await set_commands()
     await dp.start_polling(bot)    

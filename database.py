@@ -21,3 +21,11 @@ def get_all_students():
         cursor.execute("SELECT * FROM students")
         students = cursor.fetchall()
         return students
+
+
+def add_new_student(name, student_class):
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO students (name, class) VALUES (?, ?)",
+                      (name, student_class)
+        )
