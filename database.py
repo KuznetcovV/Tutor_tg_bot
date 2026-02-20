@@ -27,5 +27,21 @@ def add_new_student(name, student_class):
     with sqlite3.connect(DB_NAME) as conn:
         cursor = conn.cursor()
         cursor.execute("INSERT INTO students (name, class) VALUES (?, ?)",
-                      (name, student_class)
-        )
+                       (name, student_class))
+
+
+def delete_student(name):
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT name, class FROM students WHERE name = ?", (name, ))
+        student = cursor.fetchone()
+        cursor.execute("DELETE FROM students WHERE name = ?", (name, ))
+        return student
+
+
+
+def change_student(name, student_class):
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        cursor.execute('UPDATE students SET name = ? , student_class = ?',
+                       (name, student_class))
