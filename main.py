@@ -8,7 +8,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import Message, BotCommand, BotCommandScopeDefault, CallbackQuery
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from dotenv import load_dotenv
-from database import init_db, get_all_students, add_new_student, delete_student
+from database import init_db, get_all_students, add_new_student, delete_student, change_student
 
 init_db()
 load_dotenv()
@@ -25,6 +25,11 @@ class AddStudent(StatesGroup):
 
 class DeleteStudent(StatesGroup):
     name = State()
+
+class ChangeStudent(StatesGroup):
+    old_name = State()
+    new_name = State()
+    student_class = State()
 
 
 @router.callback_query(F.data == 'add_student')
@@ -50,6 +55,34 @@ async def capture_student_class(message: Message, state: FSMContext):
     await print_all_students(message)
     await state.clear()
 
+@router.callback_query(F.data == 'change_student')
+async def start_change(callback: CallbackQuery, state: FSMContext):
+    await callback.message.answer('Введите имя ученика, информацию о котором хотите изменить: ')
+    await state.set_state(ChangeStudent.old_name)
+
+@router.message(F.text, ChangeStudent.old_name)
+async def capture_old_name(message: Message, state: FSMContext):
+    await state.update_data(old_name=message.text)
+    await message.answer('Введите новое имя для ученика')
+    await state.set_state(ChangeStudent.new_name)
+
+@router.message(F.text, ChangeStudent.new_name)
+async def capture_new_name(message: Message, state: FSMContext):
+    await state.update_data(new_name=message.text)
+    await message.answer('Введите новый класс для ученика: ')
+    await state.set_state(ChangeStudent.student_class)
+
+@router.message(F.text, ChangeStudent.student_class)
+async def capture_new_class(message: Message, state: FSMContext):
+    await state.update_data(student_class=message.text)
+    new_student = await state.get_data()
+    change_student(new_student.get('old_name'), new_student.get('new_name'), new_student.get('student_class'))
+    msg_text = (f"Запись об ученике {new_student.get('old_name')} изменена:"
+                f"{new_student.get('new_name')} учится в {new_student.get('student_class')} классе")
+    await message.answer(msg_text)
+    await print_all_students(message)
+    await state.clear()    
+
 
 @router.callback_query(F.data == 'delete_student')
 async def start_delete(callback: CallbackQuery, state: FSMContext):
@@ -62,7 +95,7 @@ async def result_of_delete(message: Message, state: FSMContext):
     await state.update_data(name=message.text)
     student = await state.get_data()
     deleted_student = delete_student(student.get('name'))
-    if delete_student:
+    if not delete_student:
         await message.answer('Ученик не найден')
         await state.clear()
         return
@@ -120,9 +153,9 @@ async def print_all_students(message):
         keyboard.button(text='Добавить ученика', callback_data='add_student')
     else:
         text = 'Список учеников:\n\n'
-        for student in students:
-            student_id, name, student_class = student
-            text += f'{student_id}. {name} - {student_class} класс.\n'
+        for student_index, student in enumerate(students, 1):
+            name, student_class = student
+            text += f'{student_index}. {name} - {student_class} класс.\n'
         keyboard.button(text='Добавить ученика', callback_data='add_student')
         keyboard.button(text='Изменить запись об ученике', callback_data='change_student')
         keyboard.button(text='Удалить ученика', callback_data='delete_student')

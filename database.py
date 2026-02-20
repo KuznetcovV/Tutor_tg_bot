@@ -18,7 +18,7 @@ def init_db():
 def get_all_students():
     with sqlite3.connect(DB_NAME) as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM students")
+        cursor.execute("SELECT name, class FROM students")
         students = cursor.fetchall()
         return students
 
@@ -39,9 +39,8 @@ def delete_student(name):
         return student
 
 
-
-def change_student(name, student_class):
+def change_student(old_name, new_name, student_class):
     with sqlite3.connect(DB_NAME) as conn:
         cursor = conn.cursor()
-        cursor.execute('UPDATE students SET name = ? , student_class = ?',
-                       (name, student_class))
+        cursor.execute('UPDATE students SET name = ? , class = ? WHERE name = ?' ,
+                       (new_name, student_class, old_name))
