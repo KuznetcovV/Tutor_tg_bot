@@ -8,7 +8,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import Message, BotCommand, BotCommandScopeDefault, CallbackQuery
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from dotenv import load_dotenv
-from database import init_db, get_all_students, add_new_student, delete_student, change_student, get_student_by_id
+from database import init_db, get_all_students, add_new_student, get_student_by_id, edit_student_by_id, delete_student_by_id
 
 init_db()
 load_dotenv()
@@ -23,14 +23,9 @@ class AddStudent(StatesGroup):
     student_class = State()
 
 
-class DeleteStudent(StatesGroup):
-    name = State()
-
-
 class ChangeStudent(StatesGroup):
-    old_name = State()
-    new_name = State()
-    student_class = State()
+    сhoosing_field = State()
+    waiting_new_value = State()
 
 
 @router.callback_query(F.data == 'add_student')
@@ -56,34 +51,46 @@ async def capture_student_class(message: Message, state: FSMContext):
     await print_all_students(message)
     await state.clear()
 
-@router.callback_query(F.data == 'change_student')
-async def start_change(callback: CallbackQuery, state: FSMContext):
-    await callback.message.answer('Введите имя ученика, информацию о котором хотите изменить: ')
-    await state.set_state(ChangeStudent.old_name)
 
-@router.message(F.text, ChangeStudent.old_name)
-async def capture_old_name(message: Message, state: FSMContext):
-    await state.update_data(old_name=message.text)
-    await message.answer('Введите новое имя для ученика')
-    await state.set_state(ChangeStudent.new_name)
+@router.callback_query(F.data.startswith('change_name_'))
+async def edit_name(callback: CallbackQuery, state: FSMContext):
+    student_id = int(callback.data.split('_')[2])
 
-@router.message(F.text, ChangeStudent.new_name)
-async def capture_new_name(message: Message, state: FSMContext):
-    await state.update_data(new_name=message.text)
-    await message.answer('Введите новый класс для ученика: ')
-    await state.set_state(ChangeStudent.student_class)
+    await state.update_data(student_id=student_id, field='name')
 
-@router.message(F.text, ChangeStudent.student_class)
-async def capture_new_class(message: Message, state: FSMContext):
-    await state.update_data(student_class=message.text)
-    new_student = await state.get_data()
-    change_student(new_student.get('old_name'), new_student.get('new_name'), new_student.get('student_class'))
-    msg_text = (f"Запись об ученике {new_student.get('old_name')} изменена:"
-                f"{new_student.get('new_name')} учится в {new_student.get('student_class')} классе")
-    await message.answer(msg_text)
+    await callback.message.edit_text('Введите новое имя ученика:')
+
+    await state.set_state(ChangeStudent.waiting_new_value)
+
+
+@router.callback_query(F.data.startswith('change_class_'))
+async def edit_class(callback: CallbackQuery, state: FSMContext):
+    student_id = int(callback.data.split('_')[2])
+
+    await state.update_data(student_id=student_id, field='class')
+
+    await callback.message.edit_text('Введите новый класс:')
+
+    await state.set_state(ChangeStudent.waiting_new_value)
+
+
+@router.message(ChangeStudent.waiting_new_value)
+async def save_new_value(message: Message, state: FSMContext):
+
+    data = await state.get_data()
+
+    student_id = data['student_id']
+    field = data['field']
+    new_value = message.text
+
+    if field == 'name':
+        edit_student_by_id(student_id, new_name=new_value)
+    else:
+        edit_student_by_id(student_id, new_class=new_value)
+
+    await message.answer("Данные обновлены")
     await print_all_students(message)
-    await state.clear()    
-
+    await state.clear()
 
 @router.callback_query(F.data.startswith('student_'))
 async def student_menu(callback: CallbackQuery):
@@ -101,33 +108,30 @@ async def student_menu(callback: CallbackQuery):
         f'{student[0]} - {student[1]} класс\n\nВыберите действие:',
         reply_markup=keyboard.as_markup()
     )
+    await callback.answer()
 
 
-@router.callback_query(F.data == 'back_to_list')
-async def back_to_list_hendler(callback: CallbackQuery):
-    await print_all_students(callback.message, edit=True)
+@router.callback_query(F.data.startswith('delete_'))
+async def delete_student(callback: CallbackQuery):
+    student_id = int(callback.data.split('_')[1])
+    name, student_class = get_student_by_id(student_id)
+    delete_student_by_id(student_id)
+    await callback.message.edit_text(text=f'{name}, который учится в {student_class} классе был удален.')
+    await print_all_students(callback.message)
 
 
-@router.callback_query(F.data == 'delete_student')
-async def start_delete(callback: CallbackQuery, state: FSMContext):
-    await callback.message.answer('Введите имя ученика')
-    await state.set_state(DeleteStudent.name)
+@router.callback_query(F.data.startswith('edit_'))
+async def edit_student(callback: CallbackQuery):
+    student_id = int(callback.data.split('_')[1])
+    name, student_class = get_student_by_id(student_id)
+    keyboard = InlineKeyboardBuilder()
+    keyboard.button(text='Изменить имя', callback_data=f'change_name_{student_id}')
+    keyboard.button(text='Изменить класс', callback_data=f'change_class_{student_id}')
+    keyboard.button(text='Назад к списку действий', callback_data=f'student_{student_id}')
 
+    keyboard.adjust(2)
 
-@router.message(F.text, DeleteStudent.name)
-async def result_of_delete(message: Message, state: FSMContext):
-    await state.update_data(name=message.text)
-    student = await state.get_data()
-    deleted_student = delete_student(student.get('name'))
-    if not delete_student:
-        await message.answer('Ученик не найден')
-        await state.clear()
-        return
-    student_name, student_class = deleted_student
-    msg_text = (f"Ученик {student_name}, который учится в {student_class} классе удален")
-    await message.answer(msg_text)
-    await print_all_students(message)
-    await state.clear()
+    await callback.message.edit_text(text=f'{name} - {student_class} класс. \nИзменить имя или класс?', reply_markup=keyboard.as_markup())
 
 
 async def set_commands():
@@ -169,7 +173,7 @@ async def start(message: Message):
     await message.answer(f'Привет, {message.from_user.full_name}')
 
 
-async def print_all_students(message: Message,edit=False):
+async def print_all_students(message: Message, edit=False):
     students = get_all_students()
     keyboard = InlineKeyboardBuilder()
     if not students:
@@ -189,6 +193,7 @@ async def print_all_students(message: Message,edit=False):
 
     if edit:
         await message.edit_text(text, reply_markup=keyboard.as_markup())
+        message.answer()
     else:
         await message.answer(text, reply_markup=keyboard.as_markup())
 
