@@ -55,10 +55,11 @@ async def capture_student_class(message: Message, state: FSMContext):
 @router.callback_query(F.data.startswith('change_name_'))
 async def edit_name(callback: CallbackQuery, state: FSMContext):
     student_id = int(callback.data.split('_')[2])
+    name, _ = get_student_by_id(student_id)
 
     await state.update_data(student_id=student_id, field='name')
 
-    await callback.message.edit_text('Введите новое имя ученика:')
+    await callback.message.edit_text(f'Введите новое имя ученика\nСтарое - {name}:')
 
     await state.set_state(ChangeStudent.waiting_new_value)
 
@@ -66,10 +67,11 @@ async def edit_name(callback: CallbackQuery, state: FSMContext):
 @router.callback_query(F.data.startswith('change_class_'))
 async def edit_class(callback: CallbackQuery, state: FSMContext):
     student_id = int(callback.data.split('_')[2])
+    name, student_class = get_student_by_id(student_id)
 
     await state.update_data(student_id=student_id, field='class')
 
-    await callback.message.edit_text('Введите новый класс:')
+    await callback.message.edit_text(f'Введите новый класс для {name}\nСтарое значение - {student_class}:')
 
     await state.set_state(ChangeStudent.waiting_new_value)
 
@@ -111,6 +113,10 @@ async def student_menu(callback: CallbackQuery):
     await callback.answer()
 
 
+@router.callback_query(F.data == 'back_to_list')
+async def back_to_list_hendler(callback: CallbackQuery):
+    await print_all_students(callback.message, edit=True)
+
 @router.callback_query(F.data.startswith('delete_'))
 async def delete_student(callback: CallbackQuery):
     student_id = int(callback.data.split('_')[1])
@@ -125,8 +131,8 @@ async def edit_student(callback: CallbackQuery):
     student_id = int(callback.data.split('_')[1])
     name, student_class = get_student_by_id(student_id)
     keyboard = InlineKeyboardBuilder()
-    keyboard.button(text='Изменить имя', callback_data=f'change_name_{student_id}')
-    keyboard.button(text='Изменить класс', callback_data=f'change_class_{student_id}')
+    keyboard.button(text=f'Изменить имя для {name}', callback_data=f'change_name_{student_id}')
+    keyboard.button(text=f'Изменить класс для {name}', callback_data=f'change_class_{student_id}')
     keyboard.button(text='Назад к списку действий', callback_data=f'student_{student_id}')
 
     keyboard.adjust(2)
