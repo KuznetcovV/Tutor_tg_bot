@@ -18,9 +18,16 @@ def init_db():
 def get_all_students():
     with sqlite3.connect(DB_NAME) as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT name, class FROM students")
+        cursor.execute("SELECT * FROM students")
         students = cursor.fetchall()
         return students
+
+
+def get_student_by_id(student_id):
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT name, class FROM students WHERE id = ?", (student_id, ))
+        return cursor.fetchone()
 
 
 def add_new_student(name, student_class):

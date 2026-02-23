@@ -8,7 +8,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import Message, BotCommand, BotCommandScopeDefault, CallbackQuery
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from dotenv import load_dotenv
-from database import init_db, get_all_students, add_new_student, delete_student, change_student
+from database import init_db, get_all_students, add_new_student, delete_student, change_student, get_student_by_id
 
 init_db()
 load_dotenv()
@@ -25,6 +25,7 @@ class AddStudent(StatesGroup):
 
 class DeleteStudent(StatesGroup):
     name = State()
+
 
 class ChangeStudent(StatesGroup):
     old_name = State()
@@ -84,6 +85,29 @@ async def capture_new_class(message: Message, state: FSMContext):
     await state.clear()    
 
 
+@router.callback_query(F.data.startswith('student_'))
+async def student_menu(callback: CallbackQuery):
+    student_id = int(callback.data.split('_')[1])
+    student = get_student_by_id(student_id)
+
+    keyboard = InlineKeyboardBuilder()
+    keyboard.button(text='Изменить', callback_data=f'edit_{student_id}')
+    keyboard.button(text='Удалить', callback_data=f'delete_{student_id}')
+    keyboard.button(text='Назад', callback_data='back_to_list')
+
+    keyboard.adjust(1)
+
+    await callback.message.edit_text(
+        f'{student[0]} - {student[1]} класс\n\nВыберите действие:',
+        reply_markup=keyboard.as_markup()
+    )
+
+
+@router.callback_query(F.data == 'back_to_list')
+async def back_to_list_hendler(callback: CallbackQuery):
+    await print_all_students(callback.message, edit=True)
+
+
 @router.callback_query(F.data == 'delete_student')
 async def start_delete(callback: CallbackQuery, state: FSMContext):
     await callback.message.answer('Введите имя ученика')
@@ -104,11 +128,6 @@ async def result_of_delete(message: Message, state: FSMContext):
     await message.answer(msg_text)
     await print_all_students(message)
     await state.clear()
-
-
-@router.message(CommandStart())
-async def start(message: Message):
-    await message.answer(f'Привет, {message.from_user.full_name}')
 
 
 async def set_commands():
@@ -145,7 +164,12 @@ async def cmd_transfers(message: Message):
     await message.answer('Все переносы')
 
 
-async def print_all_students(message):
+@router.message(CommandStart())
+async def start(message: Message):
+    await message.answer(f'Привет, {message.from_user.full_name}')
+
+
+async def print_all_students(message: Message,edit=False):
     students = get_all_students()
     keyboard = InlineKeyboardBuilder()
     if not students:
@@ -153,14 +177,20 @@ async def print_all_students(message):
         keyboard.button(text='Добавить ученика', callback_data='add_student')
     else:
         text = 'Список учеников:\n\n'
+        text += 'Выберите ученика:'
         for student_index, student in enumerate(students, 1):
-            name, student_class = student
-            text += f'{student_index}. {name} - {student_class} класс.\n'
+            student_id, name, student_class = student
+            keyboard.button(
+                text=f"{student_index}. {name} - {student_class} класс",
+                callback_data=f"student_{student_id}"
+            )
         keyboard.button(text='Добавить ученика', callback_data='add_student')
-        keyboard.button(text='Изменить запись об ученике', callback_data='change_student')
-        keyboard.button(text='Удалить ученика', callback_data='delete_student')
-        keyboard.adjust(2)
-    await message.answer(text, reply_markup=keyboard.as_markup())
+        keyboard.adjust(1)
+
+    if edit:
+        await message.edit_text(text, reply_markup=keyboard.as_markup())
+    else:
+        await message.answer(text, reply_markup=keyboard.as_markup())
 
 
 async def main():
