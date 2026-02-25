@@ -14,6 +14,54 @@ def init_db():
             )
         """)
 
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS lessons (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            student_id INTEGER,
+            weekday INTEGER,
+            time_start TEXT,
+            time_end TEXT,
+            FOREIGN KEY (student_id) REFERENCES students (id)
+            )
+        """)
+
+
+def add_lesson(student_id, weekday, time_start, time_end):
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        cursor.execute("PRAGMA foreign_keys = ON")
+        cursor.execute("""
+        INSERT INTO lessons (
+            student_id, weekday, time_start, time_end
+            )
+            VALUES (?, ?, ?, ?)
+        """, (student_id, weekday, time_start, time_end))
+
+
+def select_all_lessons():
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        cursor.execute("PRAGMA foreign_keys = ON")
+        cursor.execute("""SELECT lessons.id, name, class, weekday, time_start, time_end
+                          FROM lessons JOIN students
+                          ON lessons.student_id = students.id
+                          ORDER BY weekday, time_start""")
+        lessons = cursor.fetchall()
+        return lessons
+
+
+def select_today_lessons(day_number):
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        cursor.execute("PRAGMA foreign_keys = ON")
+        cursor.execute("""SELECT name, class, weekday, time_start, time_end
+                          FROM lessons JOIN students
+                          ON lessons.student_id = students.id
+                          WHERE weekday = ?
+                          ORDER BY time_start""", (day_number, ))
+        lessons = cursor.fetchall()
+        return lessons
+
 
 def get_all_students():
     with sqlite3.connect(DB_NAME) as conn:
