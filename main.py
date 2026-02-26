@@ -89,7 +89,7 @@ async def end_of_add_new_lesson(callback: CallbackQuery, state: FSMContext):
     time_start = lesson.get('time_start')
     time_end = lesson.get('time_end')
     add_lesson(student_id, weekday, time_start, time_end)
-    text = f'Ученику {name_student}, который учится в {student_class} добавлено занятие в {WEEKDAYS[weekday]}.\n Время: {time_start:02}:00 - {end_time:02}:00'
+    text = f'Ученику {name_student}, который учится в {student_class} добавлено занятие в {SHORT_WEEKDAYS[weekday]}.\n Время: {time_start:02}:00 - {end_time:02}:00'
     await callback.message.edit_text(text=text)
     await print_all_lessons(callback.message)
     await state.clear()
