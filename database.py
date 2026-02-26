@@ -63,6 +63,15 @@ def select_today_lessons(day_number):
         return lessons
 
 
+def select_occupied_intervals(day_number):
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        cursor.execute("""SELECT time_start, time_end
+                          FROM lessons
+                          WHERE weekday = ?""", (day_number, ))
+        intervals = cursor.fetchall()
+        return intervals
+
 def get_all_students():
     with sqlite3.connect(DB_NAME) as conn:
         cursor = conn.cursor()

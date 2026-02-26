@@ -8,7 +8,8 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import Message, BotCommand, BotCommandScopeDefault, CallbackQuery
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from dotenv import load_dotenv
-from database import init_db, get_all_students, add_new_student, get_student_by_id, edit_student_by_id, delete_student_by_id, select_all_lessons, add_lesson
+from database import init_db, get_all_students, add_new_student, get_student_by_id, edit_student_by_id, delete_student_by_id, select_all_lessons, add_lesson, select_occupied_intervals, select_today_lessons
+from datetime import datetime
 
 init_db()
 load_dotenv()
@@ -16,6 +17,14 @@ TOKEN = os.getenv('BOT_TOKEN')
 dp = Dispatcher(storage=MemoryStorage())
 bot = Bot(token=TOKEN)
 router = Router()
+
+FULL_WEEKDAYS = ["Понедельник",
+            "Вторник",
+            "Среда",
+            "Четверг",
+            "Пятница",
+            "Суббота",
+            "Воскресенье"]
 
 SHORT_WEEKDAYS = ["Пн",
             "Вт",
@@ -60,7 +69,7 @@ async def choose_weekday_for_student(callback: CallbackQuery, state: FSMContext)
     await state.update_data(student_id=int(callback.data.split('_')[-1]))
     keyboard = InlineKeyboardBuilder()
     for i in range(7):
-        keyboard.button(text=f'{WEEKDAYS[i]}', callback_data=f'add_weekday_{i}')
+        keyboard.button(text=f'{FULL_WEEKDAYS[i]}', callback_data=f'add_weekday_{i}')
 
     keyboard.adjust(1)
     await callback.message.edit_text(text='Выберите день недели', reply_markup=keyboard.as_markup())
@@ -68,11 +77,17 @@ async def choose_weekday_for_student(callback: CallbackQuery, state: FSMContext)
 
 @router.callback_query(F.data.startswith('add_weekday_'), AddLesson.weekday)
 async def chose_time_interval(callback: CallbackQuery, state: FSMContext):
-    await state.update_data(weekday=int(callback.data.split('_')[-1]))
+    weekday = int(callback.data.split('_')[-1])
+    await state.update_data(weekday=weekday)
+    occupied_intervals = select_occupied_intervals(weekday)
+    free_intervals = [(i, i + 1) for i in range(12, 22) if (str(i), str(i + 1)) not in occupied_intervals]
+    if not free_intervals:
+        await callback.answer('Свободного времени в этот день недели нет', show_alert=True)
+        return
     keyboard = InlineKeyboardBuilder()
-    for i in range(12, 22):
-        keyboard.button(text=f'{i:02}:00-{i + 1:02}:00', callback_data=f'add_timestart_{i}_{i+1}')
-
+    for interval in free_intervals:
+        start, end = interval
+        keyboard.button(text=f'{start:02}:00-{end:02}:00', callback_data=f'add_timestart_{start}_{end}')
     keyboard.adjust(2)
     await callback.message.edit_text(text='Выберите время:', reply_markup=keyboard.as_markup())
     await state.set_state(AddLesson.time_start)
@@ -89,7 +104,7 @@ async def end_of_add_new_lesson(callback: CallbackQuery, state: FSMContext):
     time_start = lesson.get('time_start')
     time_end = lesson.get('time_end')
     add_lesson(student_id, weekday, time_start, time_end)
-    text = f'Ученику {name_student}, который учится в {student_class} добавлено занятие в {SHORT_WEEKDAYS[weekday]}.\n Время: {time_start:02}:00 - {end_time:02}:00'
+    text = f'Ученику {name_student}, который учится в {student_class}\nдобавлено занятие в {FULL_WEEKDAYS[weekday]}.\n Время: {time_start:02}:00 - {end_time:02}:00'
     await callback.message.edit_text(text=text)
     await print_all_lessons(callback.message)
     await state.clear()
@@ -236,12 +251,17 @@ async def all_lessons(message: Message):
 
 @router.message(Command('lessons_today'))
 async def lessons_today(message: Message):
-    pass
-
-
-@router.message(Command('lessons_today'))
-async def cmd_students_today(message: Message):
-    await message.answer('Вот ученики, которые сегодня будут')
+    weekday = datetime.now().weekday()
+    lessons_today_list = select_today_lessons(weekday)
+    if not lessons_today_list:
+        text = 'Сегодня занятий нет'
+        await message.answer(text)
+        return
+    text = f'Сегодня {FULL_WEEKDAYS[weekday]}.\nСписок занятий:\n'
+    for index, lesson in enumerate(lessons_today_list, 1):
+        name, student_class, _, time_start, time_end = lesson
+        text += f'\n{index}. {name} {student_class} класс\n{time_start}:00 - {time_end}:00'
+    await message.answer(text)
 
 
 @router.message(Command('payments'))
