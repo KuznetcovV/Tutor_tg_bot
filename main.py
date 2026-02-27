@@ -8,7 +8,13 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import Message, BotCommand, BotCommandScopeDefault, CallbackQuery
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from dotenv import load_dotenv
-from database import init_db, get_all_students, add_new_student, get_student_by_id, edit_student_by_id, delete_student_by_id, select_all_lessons, add_lesson, select_occupied_intervals, select_today_lessons
+from database import (init_db,
+                      get_all_students, add_new_student, get_student_by_id,
+                      edit_student_by_id, delete_student_by_id,
+                      select_all_lessons, add_lesson,
+                      select_occupied_intervals,
+                      select_today_lessons, get_lesson_by_id,
+                      delete_lesson_by_id)
 from datetime import datetime
 
 init_db()
@@ -64,6 +70,7 @@ async def start_add_lesson(callback: CallbackQuery, state: FSMContext):
     await callback.message.edit_text(text='Выберите ученика, которому нужно добавить занятие', reply_markup=keyboard.as_markup())
     await state.set_state(AddLesson.student_id)
 
+
 @router.callback_query(F.data.startswith('add_lesson_to_'), AddLesson.student_id)
 async def choose_weekday_for_student(callback: CallbackQuery, state: FSMContext):
     await state.update_data(student_id=int(callback.data.split('_')[-1]))
@@ -74,6 +81,7 @@ async def choose_weekday_for_student(callback: CallbackQuery, state: FSMContext)
     keyboard.adjust(1)
     await callback.message.edit_text(text='Выберите день недели', reply_markup=keyboard.as_markup())
     await state.set_state(AddLesson.weekday)
+
 
 @router.callback_query(F.data.startswith('add_weekday_'), AddLesson.weekday)
 async def chose_time_interval(callback: CallbackQuery, state: FSMContext):
@@ -183,8 +191,8 @@ async def student_menu(callback: CallbackQuery):
     student = get_student_by_id(student_id)
 
     keyboard = InlineKeyboardBuilder()
-    keyboard.button(text='Изменить', callback_data=f'edit_{student_id}')
-    keyboard.button(text='Удалить', callback_data=f'delete_{student_id}')
+    keyboard.button(text='Изменить', callback_data=f'edit_student_{student_id}')
+    keyboard.button(text='Удалить', callback_data=f'delete_student_{student_id}')
     keyboard.button(text='Назад', callback_data='back_to_list')
 
     keyboard.adjust(1)
@@ -201,18 +209,18 @@ async def back_to_list_hendler(callback: CallbackQuery):
     await print_all_students(callback.message, edit=True)
 
 
-@router.callback_query(F.data.startswith('delete_'))
+@router.callback_query(F.data.startswith('delete_student_'))
 async def delete_student(callback: CallbackQuery):
-    student_id = int(callback.data.split('_')[1])
+    student_id = int(callback.data.split('_')[-1])
     name, student_class = get_student_by_id(student_id)
     delete_student_by_id(student_id)
     await callback.message.edit_text(text=f'{name}, который учится в {student_class} классе был удален.')
     await print_all_students(callback.message)
 
 
-@router.callback_query(F.data.startswith('edit_'))
+@router.callback_query(F.data.startswith('edit_student_'))
 async def edit_student(callback: CallbackQuery):
-    student_id = int(callback.data.split('_')[1])
+    student_id = int(callback.data.split('_')[-1])
     name, student_class = get_student_by_id(student_id)
     keyboard = InlineKeyboardBuilder()
     keyboard.button(text=f'Изменить имя для {name}', callback_data=f'change_name_{student_id}')
@@ -222,6 +230,42 @@ async def edit_student(callback: CallbackQuery):
     keyboard.adjust(2)
 
     await callback.message.edit_text(text=f'{name} - {student_class} класс. \nИзменить имя или класс?', reply_markup=keyboard.as_markup())
+
+
+@router.callback_query(F.data.startswith('delete_lesson_'))
+async def delete_lesson(callback: CallbackQuery):
+    lesson_id = int(callback.data.split('_')[-1])
+    delete_lesson_by_id(lesson_id)
+    await callback.message.edit_text(text='Запись о занятии удалена.')
+    await print_all_lessons(callback.message)
+
+
+@router.callback_query(F.data.startswith('edit_lesson_'))
+async def edit_lesson(callback: CallbackQuery):
+    pass
+
+
+@router.callback_query(F.data == 'back_to_list_lessons')
+async def back_to_lessons(callback: CallbackQuery):
+    await print_all_lessons(callback.message, edit=True)
+
+
+@router.callback_query(F.data.startswith('lesson_'))
+async def lesson_menu(callback: CallbackQuery):
+    lesson_id = int(callback.data.split('_')[-1])
+    lesson = get_lesson_by_id(lesson_id)
+    name_student, weekday, time_start, time_end = lesson
+
+    keyboard = InlineKeyboardBuilder()
+    keyboard.button(text='Изменить', callback_data=f'edit_lesson_{lesson_id}')
+    keyboard.button(text='Удалить', callback_data=f'delete_lesson_{lesson_id}')
+    keyboard.button(text='Назад', callback_data='back_to_list_lessons')
+
+    keyboard.adjust(2)
+
+    await callback.message.edit_text(
+        f'{name_student}\n{weekday}\n{time_start}:00 - {time_end}:00\nВыберите действие:', reply_markup=keyboard.as_markup()
+    )
 
 
 async def set_commands():
@@ -323,7 +367,6 @@ async def print_all_lessons(message: Message, edit=False):
 
     if edit:
         await message.edit_text(text, reply_markup=keyboard.as_markup())
-        message.answer()
     else:
         await message.answer(text, reply_markup=keyboard.as_markup())
 

@@ -72,6 +72,7 @@ def select_occupied_intervals(day_number):
         intervals = cursor.fetchall()
         return intervals
 
+
 def get_all_students():
     with sqlite3.connect(DB_NAME) as conn:
         cursor = conn.cursor()
@@ -85,6 +86,18 @@ def get_student_by_id(student_id):
         cursor = conn.cursor()
         cursor.execute("SELECT name, class FROM students WHERE id = ?", (student_id, ))
         return cursor.fetchone()
+
+
+def get_lesson_by_id(lesson_id):
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        cursor.execute("""SELECT name, weekday, time_start, time_end
+                          FROM lessons
+                          JOIN students
+                          ON students.id = lessons.student_id
+                          WHERE lessons.id = ?""", (lesson_id, ))
+        lesson = cursor.fetchone()
+        return lesson
 
 
 def edit_student_by_id(student_id, new_name=None, new_class=None):
@@ -105,6 +118,11 @@ def add_new_student(name, student_class):
         cursor.execute("INSERT INTO students (name, class) VALUES (?, ?)",
                        (name, student_class))
 
+
+def delete_lesson_by_id(lesson_id):
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM lessons WHERE id = ?", (lesson_id, ))
 
 def delete_student_by_id(id):
     with sqlite3.connect(DB_NAME) as conn:
