@@ -63,6 +63,20 @@ def select_today_lessons(day_number):
         return lessons
 
 
+def select_occupied_intervals_by_lesson_id(lesson_id):
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        cursor.execute("""SELECT time_start, time_end
+                          FROM lessons
+                          WHERE weekday = (
+                                SELECT weekday
+                                FROM lessons
+                                WHERE id = ?)
+                          AND id != ?""", (lesson_id, lesson_id))
+        intervals = cursor.fetchall()
+        return [(int(start), int(end)) for start, end in intervals]
+
+
 def select_occupied_intervals(day_number):
     with sqlite3.connect(DB_NAME) as conn:
         cursor = conn.cursor()
@@ -100,16 +114,33 @@ def get_lesson_by_id(lesson_id):
         return lesson
 
 
+def update_lesson_data(lessond_id, field, new_value):
+    ALLOWED_FIELDS = {'weekday',
+                      'timeinterval',
+                      'student_id'}
+    if field not in ALLOWED_FIELDS:
+        raise ValueError('Недопустимое поле')
+
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        if field == 'timeinterval':
+            sql = 'UPDATE lessons SET time_start = ?, time_end = ? WHERE id = ?'
+            cursor.execute(sql, (new_value[0], new_value[1], lessond_id))
+        else:
+            sql = f'UPDATE lessons SET {field} = ? WHERE id = ?'
+            cursor.execute(sql, (new_value, lessond_id))
+
+
 def edit_student_by_id(student_id, new_name=None, new_class=None):
     with sqlite3.connect(DB_NAME) as conn:
         cursor = conn.cursor()
         if new_name and new_class:
-            cursor.execute("UPDATE students SET name = ?, class = ? WHERE ID = ?", (new_name, new_class, student_id))
+            cursor.execute("UPDATE students SET name = ?, class = ? WHERE id = ?", (new_name, new_class, student_id))
             return
         if new_name:
-            cursor.execute("UPDATE students SET name = ? WHERE ID = ?", (new_name, student_id))
+            cursor.execute("UPDATE students SET name = ? WHERE id = ?", (new_name, student_id))
             return
-        cursor.execute("UPDATE students SET class = ? WHERE ID = ?", (new_class, student_id))
+        cursor.execute("UPDATE students SET class = ? WHERE id = ?", (new_class, student_id))
 
 
 def add_new_student(name, student_class):
@@ -124,6 +155,7 @@ def delete_lesson_by_id(lesson_id):
         cursor = conn.cursor()
         cursor.execute("DELETE FROM lessons WHERE id = ?", (lesson_id, ))
 
+
 def delete_student_by_id(id):
     with sqlite3.connect(DB_NAME) as conn:
         cursor = conn.cursor()
@@ -133,5 +165,5 @@ def delete_student_by_id(id):
 def change_student(old_name, new_name, student_class):
     with sqlite3.connect(DB_NAME) as conn:
         cursor = conn.cursor()
-        cursor.execute('UPDATE students SET name = ? , class = ? WHERE name = ?' ,
+        cursor.execute('UPDATE students SET name = ? , class = ? WHERE name = ?',
                        (new_name, student_class, old_name))

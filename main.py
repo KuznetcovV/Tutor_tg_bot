@@ -1,9 +1,10 @@
 import asyncio
 import os
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.fsm.context import FSMContext
 from aiogram import Bot, Dispatcher, Router, F
-from aiogram.filters import CommandStart, Command
+from aiogram.filters import CommandStart, Command, StateFilter
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import Message, BotCommand, BotCommandScopeDefault, CallbackQuery
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -14,7 +15,8 @@ from database import (init_db,
                       select_all_lessons, add_lesson,
                       select_occupied_intervals,
                       select_today_lessons, get_lesson_by_id,
-                      delete_lesson_by_id)
+                      delete_lesson_by_id, update_lesson_data,
+                      select_occupied_intervals_by_lesson_id)
 from datetime import datetime
 
 init_db()
@@ -55,6 +57,12 @@ class AddLesson(StatesGroup):
     student_id = State()
     weekday = State()
     time_start = State()
+
+
+class EditLesson(StatesGroup):
+    waiting_weekday = State()
+    waiting_student = State()
+    waiting_time_interval = State()
 
 
 @router.callback_query(F.data == 'add_lesson')
@@ -232,24 +240,6 @@ async def edit_student(callback: CallbackQuery):
     await callback.message.edit_text(text=f'{name} - {student_class} класс. \nИзменить имя или класс?', reply_markup=keyboard.as_markup())
 
 
-@router.callback_query(F.data.startswith('delete_lesson_'))
-async def delete_lesson(callback: CallbackQuery):
-    lesson_id = int(callback.data.split('_')[-1])
-    delete_lesson_by_id(lesson_id)
-    await callback.message.edit_text(text='Запись о занятии удалена.')
-    await print_all_lessons(callback.message)
-
-
-@router.callback_query(F.data.startswith('edit_lesson_'))
-async def edit_lesson(callback: CallbackQuery):
-    pass
-
-
-@router.callback_query(F.data == 'back_to_list_lessons')
-async def back_to_lessons(callback: CallbackQuery):
-    await print_all_lessons(callback.message, edit=True)
-
-
 @router.callback_query(F.data.startswith('lesson_'))
 async def lesson_menu(callback: CallbackQuery):
     lesson_id = int(callback.data.split('_')[-1])
@@ -264,8 +254,127 @@ async def lesson_menu(callback: CallbackQuery):
     keyboard.adjust(2)
 
     await callback.message.edit_text(
-        f'{name_student}\n{weekday}\n{time_start}:00 - {time_end}:00\nВыберите действие:', reply_markup=keyboard.as_markup()
+        f'{name_student}\n{FULL_WEEKDAYS[weekday]}\n{time_start}:00 - {time_end}:00\nВыберите действие:', reply_markup=keyboard.as_markup()
     )
+
+
+@router.callback_query(F.data.startswith('delete_lesson_'))
+async def delete_lesson(callback: CallbackQuery):
+    lesson_id = int(callback.data.split('_')[-1])
+    delete_lesson_by_id(lesson_id)
+    await callback.message.edit_text(text='Запись о занятии удалена.')
+    await print_all_lessons(callback.message)
+
+
+@router.callback_query(F.data == 'back_to_list_lessons')
+async def back_to_lessons(callback: CallbackQuery):
+    await print_all_lessons(callback.message, edit=True)
+
+
+@router.callback_query(F.data.startswith('edit_lesson_student_'))
+async def edit_lesson_student(callback: CallbackQuery, state: FSMContext):
+    lesson_id = int(callback.data.split('_')[-1])
+    keyboard = InlineKeyboardBuilder()
+    await state.update_data(lesson_id=lesson_id, field="student_id")
+    students = get_all_students()
+    text = 'Список учеников:\n\n'
+    text += 'Выберите ученика:'
+    for student_index, student in enumerate(students, 1):
+        student_id, name, student_class = student
+        keyboard.button(
+            text=f"{student_index}. {name} - {student_class} класс",
+            callback_data=f"end_edit_lesson_student_{student_id}"
+        )
+    keyboard.adjust(1)
+    try:
+        await callback.message.edit_text(text='Выберите нового ученика:', reply_markup=keyboard.as_markup())
+    except TelegramBadRequest as e:
+        if 'message is not modified' in str(e):
+            pass
+        else:
+            raise
+    await state.set_state(EditLesson.waiting_student)
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith('edit_weekday_'))
+async def edit_weekday(callback: CallbackQuery, state: FSMContext):
+    lesson_id = int(callback.data.split('_')[-1])
+    await state.update_data(lesson_id=lesson_id, field="weekday")
+    keyboard = InlineKeyboardBuilder()
+    for i, day in enumerate(FULL_WEEKDAYS):
+        keyboard.button(text=day, callback_data=f'end_edit_lesson_weekday_{i}')
+
+    keyboard.adjust(1)
+    try:
+        await callback.message.edit_text(text='Выберите новый день:', reply_markup=keyboard.as_markup())
+    except TelegramBadRequest as e:
+        if 'message is not modified' in str(e):
+            pass
+        else:
+            raise
+    await state.set_state(EditLesson.waiting_weekday)
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith('edit_timeinterval_'))
+async def edit_timeinterval(callback: CallbackQuery, state: FSMContext):
+    lesson_id = int(callback.data.split('_')[-1])
+    await state.update_data(lesson_id=lesson_id, field='timeinterval')
+    keyboard = InlineKeyboardBuilder()
+    occupied_intervals = select_occupied_intervals_by_lesson_id(lesson_id)
+    free_intervals = [(i, i + 1) for i in range(12, 22) if (i, (i + 1)) not in occupied_intervals]
+    if not free_intervals:
+        await callback.answer('Свободного времени в этот день недели нет', show_alert=True)
+        return
+    for interval in free_intervals:
+        start, end = interval
+        keyboard.button(text=f'{start}:00-{end}:00', callback_data=f'end_edit_lesson_time_{start}_{end}')
+    keyboard.adjust(2)
+    try:
+        await callback.message.edit_text(text='Выберите время: ', reply_markup=keyboard.as_markup())
+    except TelegramBadRequest as e:
+        if 'message is not modified' in str(e):
+            pass
+        else:
+            raise
+    await state.set_state(EditLesson.waiting_time_interval)
+    await callback.answer()
+
+@router.callback_query(F.data.startswith('edit_lesson_'))
+async def edit_lesson(callback: CallbackQuery, state: FSMContext):
+    lesson_id = int(callback.data.split('_')[-1])
+    keyboard = InlineKeyboardBuilder()
+    keyboard.button(text='Изменить день', callback_data=f'edit_weekday_{lesson_id}')
+    keyboard.button(text='Изменить время', callback_data=f'edit_timeinterval_{lesson_id}')
+    keyboard.button(text='Изменить ученика', callback_data=f'edit_lesson_student_{lesson_id}')
+
+    keyboard.adjust(1)
+    try:
+        await callback.message.edit_text(text='Выберите изменение: ', reply_markup=keyboard.as_markup())
+    except TelegramBadRequest as e:
+        if 'message is not modified' in str(e):
+            pass
+        else:
+            raise
+
+@router.callback_query(F.data.startswith('end_edit_lesson_'), StateFilter(EditLesson.waiting_weekday, EditLesson.waiting_student, EditLesson.waiting_time_interval))
+async def set_new_weekday(callback: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    lesson_id = data.get('lesson_id')
+    field = data.get('field')
+
+    if field == 'timeinterval':
+        start, end = callback.data.split('_')[-2:]
+        new_value = (start, end)
+    else:
+        new_value = int(callback.data.split('_')[-1])
+
+    update_lesson_data(lesson_id, field, new_value)
+    text = 'Изменения сохранены.'
+    await callback.message.answer(text)
+    await print_all_lessons(callback.message)
+    await state.clear()
 
 
 async def set_commands():
