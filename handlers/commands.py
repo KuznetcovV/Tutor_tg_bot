@@ -2,10 +2,10 @@ from aiogram import Router
 from aiogram.filters import Command, CommandStart
 from aiogram.types import Message
 
-from handlers.lessons import print_all_lessons
+from handlers.lessons import print_all_lessons, print_all_weekdays
 from handlers.students import print_all_students
 
-from services.lessons_service import get_today_lessons_text
+from services.lessons_service import get_lessons_to_weekday_text
 
 router = Router()
 
@@ -20,6 +20,11 @@ async def cmd_today(message: Message):
     await message.answer('Вот твои дела на сегодня')
 
 
+@router.message(Command('weekday_schedule'))
+async def cmd_weekday_schedule(message: Message):
+    await print_all_weekdays(message)
+
+
 @router.message(Command('students'))
 async def cmd_students(message: Message):
     await print_all_students(message)
@@ -32,7 +37,7 @@ async def all_lessons(message: Message):
 
 @router.message(Command('lessons_today'))
 async def lessons_today(message: Message):
-    text = get_today_lessons_text()
+    text = get_lessons_to_weekday_text()
     await message.answer(text)
 
 

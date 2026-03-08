@@ -107,3 +107,12 @@ def edit_lesson_kb(lesson_id):
 
     keyboard.adjust(1)
     return keyboard.as_markup()
+
+
+def all_weekdays_kb():
+    keyboard = InlineKeyboardBuilder()
+    for i in range(len(FULL_WEEKDAYS)):
+        keyboard.button(text=f'{FULL_WEEKDAYS[i]}',
+                        callback_data=f'print_lessons_for_weekday_{i}')
+    keyboard.adjust(1)
+    return keyboard.as_markup()

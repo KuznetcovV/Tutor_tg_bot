@@ -12,7 +12,8 @@ from keyboards.lessons_kb import (start_add_lesson_kb,
                                   edit_weekday_kb,
                                   edit_timeinterval_kb,
                                   edit_lesson_kb,
-                                  print_all_lessons_kb)
+                                  print_all_lessons_kb,
+                                  all_weekdays_kb)
 from services.lessons_service import (get_students_for_lesson,
                                       get_free_intervals_for_weekday,
                                       create_lesson_from_state,
@@ -20,7 +21,8 @@ from services.lessons_service import (get_students_for_lesson,
                                       delete_lesson_service,
                                       get_free_intervals_for_edit,
                                       update_lesson,
-                                      get_all_lessons)
+                                      get_all_lessons,
+                                      get_lessons_to_weekday_text)
 
 
 router = Router()
@@ -205,6 +207,13 @@ async def set_new_weekday(callback: CallbackQuery, state: FSMContext):
     await state.clear()
 
 
+@router.callback_query(F.data.startswith('print_lessons_for_weekday_'))
+async def print_lessons_for_weekday(callback: CallbackQuery):
+    weekday = int(callback.data.split('_')[-1])
+    text = get_lessons_to_weekday_text(weekday)
+    await callback.message.edit_text(text)
+
+
 async def print_all_lessons(message: Message, edit=False):
     lessons = get_all_lessons()
     if not lessons:
@@ -219,3 +228,9 @@ async def print_all_lessons(message: Message, edit=False):
         await message.edit_text(text, reply_markup=kb)
     else:
         await message.answer(text, reply_markup=kb)
+
+
+async def print_all_weekdays(message: Message):
+    text = 'Выберите день недели:'
+    kb = all_weekdays_kb()
+    await message.answer(text, reply_markup=kb)

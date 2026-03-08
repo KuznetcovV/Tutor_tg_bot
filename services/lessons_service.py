@@ -1,6 +1,6 @@
 from datetime import datetime
 from utils.constants import FULL_WEEKDAYS
-from database.queries.selects import (select_today_lessons,
+from database.queries.selects import (select_lessons_for_weekday,
                                       select_all_students,
                                       select_all_lessons,
                                       select_occupied_intervals,
@@ -12,13 +12,13 @@ from database.queries.inserts import add_lesson
 from database.queries.deletes import delete_lesson_by_id
 
 
-def get_today_lessons_text():
-    weekday = datetime.now().weekday()
-    lessons_today_list = select_today_lessons(weekday)
+def get_lessons_to_weekday_text(weekday=datetime.now().weekday()):
+    weekday_text = FULL_WEEKDAYS[weekday]
+    lessons_today_list = select_lessons_for_weekday(weekday)
     if not lessons_today_list:
-        text = 'Сегодня занятий нет'
+        text = f'{weekday_text}.\nЗанятий нет'
         return text
-    text = f'Сегодня {FULL_WEEKDAYS[weekday]}.\nСписок занятий:\n'
+    text = f'{FULL_WEEKDAYS[weekday]}.\nСписок занятий:\n'
     for index, lesson in enumerate(lessons_today_list, 1):
         name, student_class, _, time_start, time_end = lesson
         text += (f'\n{index}. {name} {student_class} класс\n'

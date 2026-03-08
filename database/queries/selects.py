@@ -16,7 +16,7 @@ def select_all_lessons():
         return lessons
 
 
-def select_today_lessons(day_number):
+def select_lessons_for_weekday(day_number):
     with sqlite3.connect(DB_NAME) as conn:
         cursor = conn.cursor()
         cursor.execute("PRAGMA foreign_keys = ON")
