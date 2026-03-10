@@ -14,6 +14,7 @@ from keyboards.lessons_kb import (start_add_lesson_kb,
                                   edit_lesson_kb,
                                   print_all_lessons_kb,
                                   all_weekdays_kb,
+                                  back_to_weekdays_kb,
                                   )
 from services.lessons_service import (get_students_for_lesson,
                                       get_free_intervals_for_weekday,
@@ -222,7 +223,8 @@ async def set_new_weekday(callback: CallbackQuery, state: FSMContext):
 async def print_lessons_for_weekday(callback: CallbackQuery):
     weekday = int(callback.data.split('_')[-1])
     text = get_lessons_to_weekday_text(weekday)
-    await callback.message.edit_text(text)
+    kb = back_to_weekdays_kb()
+    await callback.message.edit_text(text, reply_markup=kb)
 
 
 async def print_all_lessons(message: Message, edit=False):
@@ -241,9 +243,12 @@ async def print_all_lessons(message: Message, edit=False):
         await message.answer(text, reply_markup=kb)
 
 
-async def print_all_weekdays(message: Message):
+async def print_all_weekdays(message: Message, edit=False):
     text = 'Выберите день недели:'
     kb = all_weekdays_kb()
+    if edit:
+        await message.edit_text(text, reply_markup=kb)
+        return
     await message.answer(text, reply_markup=kb)
 
 
@@ -310,3 +315,10 @@ LESSON_STATE_SCREENS = {
     AddLesson.weekday: show_weekday_screen,
     AddLesson.time_start: show_time_screen
 }
+
+
+@router.callback_query(F.data == 'back_to_weekdays')
+async def back_to_weekdays(callback: CallbackQuery):
+    await print_all_weekdays(callback.message, edit=True)
+
+    await callback.answer()

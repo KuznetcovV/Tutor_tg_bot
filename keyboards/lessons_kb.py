@@ -132,3 +132,9 @@ def back_cancel_kb():
     keyboard.button(text='Отмена', callback_data='back_to_lessons_list')
     keyboard.button(text='Назад', callback_data='fsm_back_lessons')
     return keyboard.as_markup()
+
+
+def back_to_weekdays_kb():
+    keyboard = InlineKeyboardBuilder()
+    keyboard.button(text='Назад', callback_data='back_to_weekdays')
+    return keyboard.as_markup()
