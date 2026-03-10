@@ -91,3 +91,4 @@ def update_lesson(lesson_id, field, new_value):
     update_lesson_data(lesson_id, field, new_value)
 
     return 'Изменения сохранены.'
+    

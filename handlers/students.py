@@ -4,7 +4,9 @@ from aiogram.fsm.context import FSMContext
 from fsm_states.student_states import AddStudent, ChangeStudent
 from keyboards.students_kb import (student_menu_kb,
                                    edit_student_kb,
-                                   all_students_kb)
+                                   all_students_kb,
+                                   cancel_kb,
+                                   back_cancel_kb)
 from services.students_service import (add_student_to_base,
                                        get_student_name_by_id,
                                        get_full_student_by_id,
@@ -15,20 +17,49 @@ from services.students_service import (add_student_to_base,
 router = Router()
 
 
+@router.callback_query(F.data == 'fsm_back_students')
+async def fsm_back(callback: CallbackQuery, state: FSMContext):
+
+    data = await state.get_data()
+
+    history = data.get('history', [])
+
+    if not history:
+        await callback.answer()
+        return
+
+    prev_state = history.pop()
+
+    await state.update_data(history=history)
+
+    screen = STATE_SCREENS.get(prev_state)
+
+    if screen:
+        await screen(callback.message, state)
+
+    await callback.answer()
+
+
 @router.callback_query(F.data == 'add_student')
 async def start_add(callback: CallbackQuery, state: FSMContext):
-    await callback.message.answer('Введите имя ученика:')
-    await state.set_state(AddStudent.name)
+    await state.clear()
+
+    await show_name_screen(callback.message, state)
+
+    await callback.answer()
 
 
-@router.message(F.text, AddStudent.name)
+@router.message(AddStudent.name)
 async def capture_name(message: Message, state: FSMContext):
     await state.update_data(name=message.text)
-    await message.answer('Отлично! Теперь напишите класс ученика: ')
-    await state.set_state(AddStudent.student_class)
+
+    current_state = await state.get_state()
+    await state.update_data(prev_state=current_state)
+
+    await show_class_screen(message, state)
 
 
-@router.message(F.text, AddStudent.student_class)
+@router.message(AddStudent.student_class)
 async def capture_student_class(message: Message, state: FSMContext):
     await state.update_data(student_class=message.text)
     student = await state.get_data()
@@ -91,8 +122,9 @@ async def student_menu(callback: CallbackQuery):
     await callback.answer()
 
 
-@router.callback_query(F.data == 'back_to_list')
-async def back_to_list_hendler(callback: CallbackQuery):
+@router.callback_query(F.data == 'back_to_students_list')
+async def back_to_list_hendler(callback: CallbackQuery, state: FSMContext):
+    await state.clear()
     await print_all_students(callback.message, edit=True)
 
 
@@ -127,3 +159,39 @@ async def print_all_students(message: Message, edit=False):
         await message.edit_text(text, reply_markup=kb)
     else:
         await message.answer(text, reply_markup=kb)
+
+
+async def show_name_screen(message: Message, state: FSMContext):
+    kb = cancel_kb()
+
+    await message.answer('Введите имя ученика:',
+                         reply_markup=kb)
+
+    await push_state(state, AddStudent.name)
+
+
+async def show_class_screen(message: Message, state: FSMContext):
+    kb = back_cancel_kb()
+
+    await message.answer('Отлично! Теперь напишите класс ученика:',
+                         reply_markup=kb)
+
+    await push_state(state, AddStudent.student_class)
+
+
+async def push_state(state: FSMContext, new_state):
+    data = await state.get_data()
+
+    history = data.get('history', [])
+    current_state = await state.get_state()
+
+    if current_state:
+        history.append(current_state)
+
+    await state.update_data(history=history)
+
+    await state.set_state(new_state)
+
+
+STATE_SCREENS = {AddStudent.name.state: show_name_screen,
+                 AddStudent.student_class.state: show_class_screen}

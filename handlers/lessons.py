@@ -13,7 +13,8 @@ from keyboards.lessons_kb import (start_add_lesson_kb,
                                   edit_timeinterval_kb,
                                   edit_lesson_kb,
                                   print_all_lessons_kb,
-                                  all_weekdays_kb)
+                                  all_weekdays_kb,
+                                  )
 from services.lessons_service import (get_students_for_lesson,
                                       get_free_intervals_for_weekday,
                                       create_lesson_from_state,
@@ -28,15 +29,42 @@ from services.lessons_service import (get_students_for_lesson,
 router = Router()
 
 
+async def safe_edit(message, text, reply_markup=None):
+    try:
+        await message.edit_text(text, reply_markup=reply_markup)
+    except TelegramBadRequest as e:
+        if 'message is not modified' in str(e):
+            pass
+        else:
+            raise
+
+
+@router.callback_query(F.data == 'fsm_back_lessons')
+async def fsm_back_lessons(callback: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    history = data.get('history', [])
+
+    if not history:
+        await callback.answer()
+        return
+
+    prev_state = history.pop()
+
+    await state.update_data(history=history)
+    await state.set_state(prev_state)
+
+    screen = LESSON_STATE_SCREENS.get(prev_state)
+
+    if screen:
+        await screen(callback.message, state, push=False)
+
+    await callback.answer()
+
+
 @router.callback_query(F.data == 'add_lesson')
 async def start_add_lesson(callback: CallbackQuery, state: FSMContext):
-    students = get_students_for_lesson()
-    kb = start_add_lesson_kb(students)
-    await callback.message.edit_text(
-        text='Выберите ученика, которому нужно добавить занятие',
-        reply_markup=kb)
-    await state.set_state(AddLesson.student_id)
     await state.update_data(history=[])
+    await show_students_screen(callback.message, state)
 
 
 @router.callback_query(F.data.startswith('add_lesson_to_'),
@@ -44,17 +72,7 @@ async def start_add_lesson(callback: CallbackQuery, state: FSMContext):
 async def choose_weekday_for_student(callback: CallbackQuery,
                                      state: FSMContext):
     await state.update_data(student_id=int(callback.data.split('_')[-1]))
-    kb = choose_weekday_for_student_kb()
-    await callback.message.edit_text(text='Выберите день недели',
-                                     reply_markup=kb)
-    current_state = await state.get_state()
-    data = await state.get_data()
-
-    history = data.get('history', [])
-    history.append(current_state)
-
-    await state.update_data(history=history)
-    await state.set_state(AddLesson.weekday)
+    await show_weekday_screen(callback.message, state)
 
 
 @router.callback_query(F.data.startswith('add_weekday_'), AddLesson.weekday)
@@ -66,16 +84,8 @@ async def chose_time_interval(callback: CallbackQuery, state: FSMContext):
         await callback.answer('Свободного времени в этот день недели нет',
                               show_alert=True)
         return
-    kb = choose_time_interval_kb(free_intervals)
-    await callback.message.edit_text(text='Выберите время:', reply_markup=kb)
-    current_state = await state.get_state()
-    data = await state.get_data()
 
-    history = data.get('history', [])
-    history.append(current_state)
-
-    await state.update_data(history=history)
-    await state.set_state(AddLesson.time_start)
+    await show_time_screen(callback.message, state)
 
 
 @router.callback_query(F.data.startswith('add_timestart_'),
@@ -84,7 +94,6 @@ async def end_of_add_new_lesson(callback: CallbackQuery, state: FSMContext):
     start_time, end_time = callback.data.split('_')[-2:]
     await state.update_data(time_start=start_time, time_end=end_time)
     lesson_data = await state.get_data()
-
     text = create_lesson_from_state(lesson_data)
 
     await callback.message.edit_text(text=text)
@@ -108,8 +117,10 @@ async def delete_lesson(callback: CallbackQuery):
     await print_all_lessons(callback.message)
 
 
-@router.callback_query(F.data == 'back_to_list_lessons')
-async def back_to_lessons(callback: CallbackQuery):
+@router.callback_query(F.data == 'back_to_lessons_list')
+async def back_to_lessons(callback: CallbackQuery, state: FSMContext):
+    await state.update_data(history=[])
+    await state.clear()
     await print_all_lessons(callback.message, edit=True)
 
 
@@ -234,3 +245,68 @@ async def print_all_weekdays(message: Message):
     text = 'Выберите день недели:'
     kb = all_weekdays_kb()
     await message.answer(text, reply_markup=kb)
+
+
+async def show_students_screen(message: Message, state: FSMContext, push=True):
+
+    students = get_students_for_lesson()
+
+    kb = start_add_lesson_kb(students)
+
+    await safe_edit(
+        message,
+        text='Выберите ученика, которому нужно добавить занятие',
+        reply_markup=kb
+    )
+    if push:
+        await push_state(state, AddLesson.student_id)
+
+
+async def show_weekday_screen(message: Message, state: FSMContext, push=True):
+
+    kb = choose_weekday_for_student_kb()
+
+    await safe_edit(
+        message,
+        text='Выберите день недели',
+        reply_markup=kb
+    )
+    if push:
+        await push_state(state, AddLesson.weekday)
+
+
+async def show_time_screen(message: Message, state: FSMContext, push=True):
+
+    data = await state.get_data()
+    weekday = data['weekday']
+
+    free_intervals = get_free_intervals_for_weekday(weekday)
+    kb = choose_time_interval_kb(free_intervals)
+
+    await safe_edit(
+        message,
+        text='Выберите время',
+        reply_markup=kb
+    )
+    if push:
+        await push_state(state, AddLesson.time_start)
+
+
+async def push_state(state: FSMContext, new_state):
+    data = await state.get_data()
+
+    history = data.get('history', [])
+    current_state = await state.get_state()
+
+    if current_state:
+        history.append(current_state)
+
+    await state.update_data(history=history)
+
+    await state.set_state(new_state)
+
+LESSON_STATE_SCREENS = {
+    AddLesson.student_id: show_students_screen,
+    AddLesson.weekday: show_weekday_screen,
+    AddLesson.time_start: show_time_screen
+}

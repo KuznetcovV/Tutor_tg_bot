@@ -26,7 +26,7 @@ def start_add_lesson_kb(students):
         keyboard.button(
             text=f'{index} - {name} - {student_class} класс.',
             callback_data=f'add_lesson_to_{id_student}')
-
+    keyboard.button(text='Отмена', callback_data='back_to_lessons_list')
     keyboard.adjust(1)
     return keyboard.as_markup()
 
@@ -36,7 +36,8 @@ def choose_weekday_for_student_kb():
     for i in range(7):
         keyboard.button(text=f'{FULL_WEEKDAYS[i]}',
                         callback_data=f'add_weekday_{i}')
-    keyboard.button(text='Назад', callback_data='add_lesson_back')
+    keyboard.button(text='Назад', callback_data='fsm_back_lessons')
+    keyboard.button(text='Отмена', callback_data='back_to_lessons_list')
 
     keyboard.adjust(1)
     return keyboard.as_markup()
@@ -48,7 +49,8 @@ def choose_time_interval_kb(free_intervals):
         start, end = interval
         keyboard.button(text=f'{start:02}:00-{end:02}:00',
                         callback_data=f'add_timestart_{start}_{end}')
-    keyboard.button(text='Назад', callback_data='add_lesson_back')
+    keyboard.button(text='Назад', callback_data='fsm_back_lessons')
+    keyboard.button(text='Отмена', callback_data='back_to_lessons_list')
 
     keyboard.adjust(2)
     return keyboard.as_markup()
@@ -58,7 +60,7 @@ def lesson_menu_kb(lesson_id):
     keyboard = InlineKeyboardBuilder()
     keyboard.button(text='Изменить', callback_data=f'edit_lesson_{lesson_id}')
     keyboard.button(text='Удалить', callback_data=f'delete_lesson_{lesson_id}')
-    keyboard.button(text='Назад', callback_data='back_to_list_lessons')
+    keyboard.button(text='Отмена', callback_data='back_to_lessons_list')
 
     keyboard.adjust(2)
     return keyboard.as_markup()
@@ -104,6 +106,7 @@ def edit_lesson_kb(lesson_id):
                     callback_data=f'edit_timeinterval_{lesson_id}')
     keyboard.button(text='Изменить ученика',
                     callback_data=f'edit_lesson_student_{lesson_id}')
+    keyboard.button(text='Назад', callback_data='fsm_back_lessons')
 
     keyboard.adjust(1)
     return keyboard.as_markup()
@@ -115,4 +118,17 @@ def all_weekdays_kb():
         keyboard.button(text=f'{FULL_WEEKDAYS[i]}',
                         callback_data=f'print_lessons_for_weekday_{i}')
     keyboard.adjust(1)
+    return keyboard.as_markup()
+
+
+def cancel_kb():
+    keyboard = InlineKeyboardBuilder()
+    keyboard.button(text='Отмена', callback_data='back_to_lessons_list')
+    return keyboard.as_markup()
+
+
+def back_cancel_kb():
+    keyboard = InlineKeyboardBuilder()
+    keyboard.button(text='Отмена', callback_data='back_to_lessons_list')
+    keyboard.button(text='Назад', callback_data='fsm_back_lessons')
     return keyboard.as_markup()
