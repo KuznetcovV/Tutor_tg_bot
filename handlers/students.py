@@ -12,7 +12,8 @@ from services.students_service import (add_student_to_base,
                                        get_full_student_by_id,
                                        save_new_value_to_base,
                                        delete_student_from_base,
-                                       get_all_students)
+                                       get_all_students,
+                                       calculate_all_prices_for_students)
 
 router = Router()
 
@@ -181,7 +182,6 @@ async def show_class_screen(message: Message, state: FSMContext):
 
 async def push_state(state: FSMContext, new_state):
     data = await state.get_data()
-
     history = data.get('history', [])
     current_state = await state.get_state()
 
@@ -191,6 +191,13 @@ async def push_state(state: FSMContext, new_state):
     await state.update_data(history=history)
 
     await state.set_state(new_state)
+
+
+async def all_payments_on_this_month(message: Message):
+    text = 'Оплаты за этот месяц:\n\n'
+    for name, price in calculate_all_prices_for_students():
+        text += f'Ученик {name}: {price} руб.\n'
+    await message.answer(text)
 
 
 STATE_SCREENS = {AddStudent.name.state: show_name_screen,

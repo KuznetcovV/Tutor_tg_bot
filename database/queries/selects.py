@@ -79,3 +79,13 @@ def select_lesson_by_id(lesson_id):
                           WHERE lessons.id = ?""", (lesson_id, ))
         lesson = cursor.fetchone()
         return lesson
+
+
+def select_all_lessons_day_for_student(student_id):
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        cursor.execute("""SELECT weekday
+                                 FROM lessons
+                                 WHERE student_id = ?""", (student_id, ))
+        lessons_days = cursor.fetchall()
+        return [int(row[0]) for row in lessons_days]

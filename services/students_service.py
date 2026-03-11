@@ -2,12 +2,40 @@ from database.queries.inserts import add_new_student
 from database.queries.updates import update_student_by_id
 from database.queries.deletes import delete_student_by_id
 from database.queries.selects import (select_student_by_id,
-                                      select_all_students)
+                                      select_all_students,
+                                      select_all_lessons_day_for_student)
+import calendar
+from datetime import datetime
 
 
 def get_all_students():
     students = select_all_students()
     return students
+
+
+def count_weekday_in_month(weekday):
+    year = datetime.now().year
+    month = datetime.now().month
+    return sum(1 for week in calendar.monthcalendar(year, month) if week[weekday] != 0)
+
+
+def calculate_price_for_student(student_id, price=1000):
+    total_lessons = 0
+
+    for weekday in select_all_lessons_day_for_student(student_id):
+        total_lessons += count_weekday_in_month(weekday)
+    total_price = total_lessons * price
+
+    return total_price
+
+
+def calculate_all_prices_for_students():
+    result = list()
+    for student in select_all_students():
+        student_id, name, *_ = student
+        payment = calculate_price_for_student(student_id)
+        result.append((name, payment))
+    return result
 
 
 def add_student_to_base(data):

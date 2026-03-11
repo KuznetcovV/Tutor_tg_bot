@@ -3,7 +3,7 @@ from aiogram.filters import Command, CommandStart
 from aiogram.types import Message
 
 from handlers.lessons import print_all_lessons, print_all_weekdays
-from handlers.students import print_all_students
+from handlers.students import print_all_students, all_payments_on_this_month
 
 from services.lessons_service import get_lessons_to_weekday_text
 
@@ -43,7 +43,7 @@ async def lessons_today(message: Message):
 
 @router.message(Command('payments'))
 async def cmd_payments(message: Message):
-    await message.answer('Список оплат за этот месяц')
+    await all_payments_on_this_month(message)
 
 
 @router.message(Command('transfers'))
