@@ -6,7 +6,7 @@ from keyboards.students_kb import (student_menu_kb,
                                    edit_student_kb,
                                    all_students_kb,
                                    cancel_kb,
-                                   back_cancel_kb)
+                                   student_class_list_kb)
 from services.students_service import (add_student_to_base,
                                        get_student_name_by_id,
                                        get_full_student_by_id,
@@ -59,13 +59,13 @@ async def capture_name(message: Message, state: FSMContext):
     await show_class_screen(message, state)
 
 
-@router.message(AddStudent.student_class)
-async def capture_student_class(message: Message, state: FSMContext):
-    await state.update_data(student_class=message.text)
+@router.callback_query(F.data.startswith('add_class_'), AddStudent.student_class)
+async def capture_student_class(callback: CallbackQuery, state: FSMContext):
+    await state.update_data(student_class=int(callback.data.split('_')[-1]))
     student = await state.get_data()
     msg_text = add_student_to_base(student)
-    await message.answer(msg_text)
-    await print_all_students(message)
+    await callback.message.edit_text(msg_text)
+    await print_all_students(callback.message)
     await state.clear()
 
 
@@ -171,9 +171,9 @@ async def show_name_screen(message: Message, state: FSMContext):
 
 
 async def show_class_screen(message: Message, state: FSMContext):
-    kb = back_cancel_kb()
+    kb = student_class_list_kb()
 
-    await message.answer('Отлично! Теперь напишите класс ученика:',
+    await message.answer('Отлично! Теперь выберите класс ученика:',
                          reply_markup=kb)
 
     await push_state(state, AddStudent.student_class)

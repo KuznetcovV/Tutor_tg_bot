@@ -22,11 +22,13 @@ def cancel_kb():
     return keyboard.as_markup()
 
 
-def back_cancel_kb():
+def student_class_list_kb():
     keyboard = InlineKeyboardBuilder()
+    for i in range(7, 12):
+        keyboard.button(text=f'{i}', callback_data=f'add_class_{i}')
+    keyboard.adjust(3)
     keyboard.button(text='Назад', callback_data='fsm_back_students')
     keyboard.button(text='Отмена', callback_data='back_to_students_list')
-    keyboard.adjust(1)
     return keyboard.as_markup()
 
 
