@@ -37,7 +37,7 @@ def get_students_for_lesson():
 
 def get_free_intervals_for_weekday(weekday):
     occupied_intervals = select_occupied_intervals(weekday)
-    free_intervals = [(i, i + 1) for i in range(12, 22) if (str(i), str(i + 1)) not in occupied_intervals]
+    free_intervals = [(i, i + 1) for i in range(12, 22) if (i, i + 1) not in occupied_intervals]
 
     return free_intervals
 

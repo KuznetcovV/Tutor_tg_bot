@@ -50,7 +50,8 @@ def select_occupied_intervals(day_number):
                           FROM lessons
                           WHERE weekday = ?""", (day_number, ))
         intervals = cursor.fetchall()
-        return intervals
+        intervals = [(int(start), int(end)) for start, end in intervals]
+        return [(int(start), int(end)) for start, end in intervals]
 
 
 def select_all_students():

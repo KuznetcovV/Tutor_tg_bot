@@ -22,6 +22,7 @@ def init_db():
             weekday INTEGER,
             time_start TEXT,
             time_end TEXT,
-            FOREIGN KEY (student_id) REFERENCES students (id)
+            CONSTRAINT lessons_students_fk
+            FOREIGN KEY (student_id) REFERENCES students (id) ON DELETE CASCADE
             )
         """)
