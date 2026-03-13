@@ -60,7 +60,8 @@ async def capture_name(message: Message, state: FSMContext):
     await show_class_screen(message, state)
 
 
-@router.callback_query(F.data.startswith('add_class_'), AddStudent.student_class)
+@router.callback_query(F.data.startswith('add_class_'),
+                       AddStudent.student_class)
 async def capture_student_class(callback: CallbackQuery, state: FSMContext):
     await state.update_data(student_class=int(callback.data.split('_')[-1]))
     student = await state.get_data()

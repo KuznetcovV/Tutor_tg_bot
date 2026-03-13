@@ -28,13 +28,16 @@ def init_db():
         """)
 
         cursor.execute("""
-        CREATE TABLE IF NOT EXIST reschedules (
+        CREATE TABLE IF NOT EXISTS reschedules (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            lesson_id INTEGER,
-            original_date TEXT,
+            lesson_id INTEGER NOT NULL,
+            original_date TEXT NOT NULL,
             new_date TEXT,
             new_start TEXT,
             new_end TEXT,
-            status TEXT
+            status TEXT NOT NULL CHECK(status IN ('moved', 'cancekked')),
+                       
+            FOREIGN KEY (lesson_id) REFERENCES lessons(id) ON DELETE CASCADE,
+            UNIQUE(lesson_id, original_date)
             )
         """)
