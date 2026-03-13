@@ -26,3 +26,15 @@ def init_db():
             FOREIGN KEY (student_id) REFERENCES students (id) ON DELETE CASCADE
             )
         """)
+
+        cursor.execute("""
+        CREATE TABLE IF NOT EXIST reschedules (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            lesson_id INTEGER,
+            original_date TEXT,
+            new_date TEXT,
+            new_start TEXT,
+            new_end TEXT,
+            status TEXT
+            )
+        """)
