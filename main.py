@@ -7,6 +7,7 @@ from database.db import init_db
 from handlers.students import router as students_router
 from handlers.lessons import router as lessons_router
 from handlers.commands import router as commands_router
+from handlers.main_menu import router as menu_router
 from utils.bot_commands import set_commands
 
 
@@ -19,7 +20,8 @@ async def main():
     init_db()
     dp.include_routers(students_router,
                        lessons_router,
-                       commands_router)
+                       commands_router,
+                       menu_router)
     await bot.delete_webhook(drop_pending_updates=True)
     await set_commands(bot)
     await dp.start_polling(bot)

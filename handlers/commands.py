@@ -2,10 +2,7 @@ from aiogram import Router
 from aiogram.filters import Command, CommandStart
 from aiogram.types import Message
 
-from handlers.lessons import print_all_lessons, print_all_weekdays
-from handlers.students import print_all_students, all_payments_on_this_month
-
-from services.lessons_service import get_lessons_to_weekday_text
+from handlers.main_menu import main_menu
 
 router = Router()
 
@@ -15,37 +12,6 @@ async def start(message: Message):
     await message.answer(f'Привет, {message.from_user.full_name}')
 
 
-@router.message(Command('today'))
-async def cmd_today(message: Message):
-    await message.answer('Вот твои дела на сегодня')
-
-
-@router.message(Command('weekday_schedule'))
-async def cmd_weekday_schedule(message: Message):
-    await print_all_weekdays(message)
-
-
-@router.message(Command('students'))
-async def cmd_students(message: Message):
-    await print_all_students(message)
-
-
-@router.message(Command('all_lessons'))
-async def all_lessons(message: Message):
-    await print_all_lessons(message)
-
-
-@router.message(Command('lessons_today'))
-async def lessons_today(message: Message):
-    text = get_lessons_to_weekday_text()
-    await message.answer(text)
-
-
-@router.message(Command('payments'))
-async def cmd_payments(message: Message):
-    await all_payments_on_this_month(message)
-
-
-@router.message(Command('transfers'))
-async def cmd_transfers(message: Message):
-    await message.answer('Все переносы')
+@router.message(Command('main_menu'))
+async def cmd_main_menu(message: Message):
+    await main_menu(message)
