@@ -15,6 +15,7 @@ from keyboards.lessons_kb import (start_add_lesson_kb,
                                   print_all_lessons_kb,
                                   all_weekdays_kb,
                                   back_to_weekdays_kb,
+                                  cancel_back_template_kb
                                   )
 from services.lessons_service import (get_students_for_lesson,
                                       get_free_intervals_for_weekday,
